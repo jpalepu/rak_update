@@ -73,5 +73,4 @@
 int Ymodem_Receive (FILE *ffd, unsigned int maxsize, char* getname);
 int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd);
 
-
 #endif

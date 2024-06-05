@@ -6,7 +6,7 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
-#include "../components/ymodem/ymodem.h"
+#include "include/ymodem.h"
 
 #define UART_PORT UART_NUM_1
 #define TX_PIN 17
@@ -15,9 +15,9 @@
 #define MAX_FILE_SIZE 256 * 1024 // 256 KB
 
 static const char* TAG = "RAK3172_FirmwareUpdate";
-static const char* firmware_path = "/firmwares/RAK3172-E_latest.bin";
 static const char* required_version = "4.1.0";
 static const char* at_cmd = "AT+VER=?\r\n";
+char* firmware_path = "/firmwares/RAK3172-E_latest.bin";
 
 void uart_init(void) {
     uart_config_t uart_config = {
@@ -34,7 +34,7 @@ void uart_init(void) {
 }
 
 
-void transmit_firmware(const char* path) {
+void transmit_firmware(char* path) {
     FILE* firmware = fopen(path, "rb");
     if (firmware == NULL) {
         ESP_LOGE(TAG, "Failed to open firmware file: %s", path);
