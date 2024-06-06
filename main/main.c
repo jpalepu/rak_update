@@ -35,6 +35,7 @@ void uart_init(void) {
 
 
 void transmit_firmware(char* path) {
+    
     FILE* firmware = fopen(path, "rb");
     if (firmware == NULL) {
         ESP_LOGE(TAG, "Failed to open firmware file: %s", path);

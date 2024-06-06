@@ -23,6 +23,7 @@
 #include "tclap/CmdLine.h"
 #include "tclap/UnlabeledValueArg.h"
 
+
 static std::vector<uint8_t> s_flashmem;
 
 static std::string s_dirName;
@@ -563,7 +564,7 @@ int actionVisualize() {
 
     spiffsMount();
     //SPIFFS_vis(&s_fs);
-    uint32_t total, used;
+    u32_t total, used;
     SPIFFS_info(&s_fs, &total, &used);
     std::cout << "total: " << total <<  std::endl << "used: " << used << std::endl;
     spiffsUnmount();
@@ -644,3 +645,4 @@ int main(int argc, const char * argv[]) {
 
     return 1;
 }
+
