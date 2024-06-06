@@ -6,7 +6,8 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
-#include "include/ymodem.h"
+#include "ymodem.h"
+#include "include/firmware.h"
 
 #define UART_PORT UART_NUM_1
 #define TX_PIN 17
@@ -33,24 +34,17 @@ void uart_init(void) {
     uart_driver_install(UART_PORT, 1024, 0, 0, NULL, 0);
 }
 
-
-void transmit_firmware(char* path) {
-    
-    FILE* firmware = fopen(path, "rb");
-    if (firmware == NULL) {
-        ESP_LOGE(TAG, "Failed to open firmware file: %s", path);
-        return;
-    }
-
+void transmit_firmware(const uint8_t* firmware_data, size_t size) {
     ESP_LOGI(TAG, "Starting YModem firmware transmission...");
-    int res = Ymodem_Transmit(path, MAX_FILE_SIZE, firmware);
-    fclose(firmware);
+    int res = Ymodem_Transmit(firmware_data, size, firmware_data); // Pass firmware data and size
     if (res == 0) {
         ESP_LOGI(TAG, "Firmware transmission completed successfully.");
     } else {
         ESP_LOGE(TAG, "Firmware transmission failed with error code: %d", res);
     }
 }
+
+
 
 void extract_version(char* response, char* version, int len) {
     // prv output test: "AT+VER=RUI_4.0.5_RAK3172-E"
@@ -90,7 +84,7 @@ void app_main() {
             snprintf(update_cmd, sizeof(update_cmd), "AT+UPDATE=2,%s\r\n", firmware_path);
             uart_write_bytes(UART_PORT, update_cmd, strlen(update_cmd));
             vTaskDelay(pdMS_TO_TICKS(1000));
-            transmit_firmware(firmware_path);
+            transmit_firmware(program, sizeof(program));
             vTaskDelay(pdMS_TO_TICKS(20000));
             ESP_LOGI(TAG, "RAK3172 firmware update finished");
         } else {
