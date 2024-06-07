@@ -18,6 +18,7 @@
     "idf.flashType": "UART",
     "files.associations": {
         ".fantomasignore": "ignore",
-        "err.h": "c"
+        "err.h": "c",
+        "ymodem.h": "c"
     }
 }
