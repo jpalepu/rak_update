@@ -12,8 +12,9 @@
 #define UART_PORT UART_NUM_1
 #define TX_PIN 17
 #define RX_PIN 16
-#define BAUD_RATE 115200
+#define BAUD_RATE 9600
 #define MAX_FILE_SIZE 256 * 1024 // 256 KB
+#define CHUNK_SIZE 1024 // 1 KB per chunk
 
 static const char* TAG = "RAK3172_FirmwareUpdate";
 static const char* required_version = "4.1.0";
@@ -31,20 +32,30 @@ void uart_init(void) {
 
     uart_param_config(UART_PORT, &uart_config);
     uart_set_pin(UART_PORT, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    uart_driver_install(UART_PORT, 1024, 0, 0, NULL, 0);
+    uart_driver_install(UART_PORT, 2048, 0, 0, NULL, 0); 
 }
 
 void transmit_firmware(const uint8_t* firmware_data, size_t size) {
     ESP_LOGI(TAG, "Starting YModem firmware transmission...");
-    int res = Ymodem_Transmit(firmware_data, size, firmware_data); // Pass firmware data and size
+
+    size_t offset = 0;
+    int res = 0;
+    while (offset < size) {
+        size_t chunk_size = (size - offset) < CHUNK_SIZE ? (size - offset) : CHUNK_SIZE;
+        res = Ymodem_Transmit(firmware_data + offset, chunk_size, firmware_data);
+        if (res != 0) {
+            ESP_LOGE(TAG, "Firmware transmission failed at offset %d with error code: %d", offset, res);
+            break;
+        }
+        offset += chunk_size;
+    }
+
     if (res == 0) {
         ESP_LOGI(TAG, "Firmware transmission completed successfully.");
     } else {
         ESP_LOGE(TAG, "Firmware transmission failed with error code: %d", res);
     }
 }
-
-
 
 void extract_version(char* response, char* version, int len) {
     // prv output test: "AT+VER=RUI_4.0.5_RAK3172-E"
