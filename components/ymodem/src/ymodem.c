@@ -35,8 +35,10 @@
 #include "rom/crc.h"
 #include "driver/gpio.h"
 #include <driver/uart.h>
-#include "D:/rak_firmware_update/components/spiffs/spiffs_vfs.h"
+#include <esp_log.h>
 
+
+static const char *TAG = "ymodem";
 
 //----------------------------------
 static void IRAM_ATTR LED_toggle() {
@@ -373,7 +375,7 @@ static void Ymodem_PrepareIntialPacket(uint8_t *data, char *fileName, uint32_t l
   // add filename
   sprintf((char *)(data+PACKET_HEADER), "%s", fileName);
 
-  //add file site
+  //add file size
   sprintf((char *)(data + PACKET_HEADER + strlen((char *)(data+PACKET_HEADER)) + 1), "%ld", length);
   data[PACKET_HEADER + strlen((char *)(data+PACKET_HEADER)) +
 	   1 + strlen((char *)(data + PACKET_HEADER + strlen((char *)(data+PACKET_HEADER)) + 1))] = ' ';
@@ -400,7 +402,7 @@ static void Ymodem_PrepareLastPacket(uint8_t *data)
 }
 
 //-----------------------------------------------------------------------------------------
-static void Ymodem_PreparePacket(uint8_t *data, uint8_t pktNo, uint32_t sizeBlk, FILE *ffd)
+static uint16_t Ymodem_PreparePacket(uint8_t *data, uint8_t pktNo, uint32_t sizeBlk, uint8_t *source)
 {
   uint16_t i, size;
   uint16_t tempCRC;
@@ -412,7 +414,7 @@ static void Ymodem_PreparePacket(uint8_t *data, uint8_t pktNo, uint32_t sizeBlk,
   size = sizeBlk < PACKET_1K_SIZE ? sizeBlk :PACKET_1K_SIZE;
   // Read block from file
   if (size > 0) {
-	  size = fread(data + PACKET_HEADER, 1, size, ffd);
+	  memcpy((char *)(data + PACKET_HEADER), (char *)source, size);
   }
 
   if ( size  < PACKET_1K_SIZE) {
@@ -424,6 +426,8 @@ static void Ymodem_PreparePacket(uint8_t *data, uint8_t pktNo, uint32_t sizeBlk,
   //tempCRC = crc16_le(0, &data[PACKET_HEADER], PACKET_1K_SIZE);
   data[PACKET_1K_SIZE + PACKET_HEADER] = tempCRC >> 8;
   data[PACKET_1K_SIZE + PACKET_HEADER + 1] = tempCRC & 0xFF;
+
+  return size;
 }
 
 //-------------------------------------------------------------
@@ -457,13 +461,14 @@ static uint8_t Ymodem_WaitResponse(uint8_t ackchr, uint8_t tmo)
 
 
 //------------------------------------------------------------------------
-int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd)
+int Ymodem_Transmit (char* fileName, const uint8_t *fileData, unsigned int fileSize)
 {
   uint8_t packet_data[PACKET_1K_SIZE + PACKET_OVERHEAD];
   uint16_t blkNumber;
   unsigned char receivedC;
   int i, err;
   uint32_t size = 0;
+  uint8_t *packet_source;
 
   // Wait for response from receiver
   err = 0;
@@ -474,8 +479,10 @@ int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd)
 
   if (err >= 45 || receivedC != CRC16) {
     send_CA();
+    ESP_LOGE(TAG, "Ymodem_Transmit: First error");
     return -1;
   }
+  ESP_LOGI(TAG, "Ymodem_Transmit: Preparing first packet");
   
   // === Prepare first block and send it =======================================
   /* When the receiving program receives this block and successfully
@@ -483,7 +490,8 @@ int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd)
    * character and then proceed with a normal YMODEM file transfer
    * beginning with a "C" or NAK tranmsitted by the receiver.
    */
-  Ymodem_PrepareIntialPacket(packet_data, sendFileName, sizeFile);
+  Ymodem_PrepareIntialPacket(packet_data, fileName, fileSize);
+  ESP_LOGI(TAG, "Ymodem_Transmit: Sending first packet");
   do 
   {
     // Send Packet
@@ -493,27 +501,40 @@ int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd)
     err = Ymodem_WaitResponse(ACK, 10);
     if (err == 0 || err == 4) {
       send_CA();
+      ESP_LOGE(TAG, "Ymodem_Transmit: Error sending packet");
       return -2;                  // timeout or wrong response
     }
-    else if (err == 2) return 98; // abort
+    else if (err == 2) {
+      ESP_LOGE(TAG, "Ymodem_Transmit: Error<2> sending packet");
+      return 98; // abort
+    }
     LED_toggle();
   }while (err != 1);
 
   // After initial block the receiver sends 'C' after ACK
   if (Ymodem_WaitResponse(CRC16, 10) != 1) {
     send_CA();
+    ESP_LOGE(TAG, "Ymodem_Transmit: Error<3> sending packet");
     return -3;
   }
   
   // === Send file blocks ======================================================
-  size = sizeFile;
+  size = fileSize;
   blkNumber = 0x01;
+  packet_source = fileData;
   
   // Resend packet if NAK  for a count of 10 else end of communication
+  ESP_LOGI(TAG, "Ymodem_Transmit: Sending file blocks");
+  int read;
   while (size)
   {
+    ESP_LOGI(TAG, "Ymodem_Transmit: Sending packet %d", blkNumber);
     // Prepare and send next packet
-    Ymodem_PreparePacket(packet_data, blkNumber, size, ffd);
+    read = Ymodem_PreparePacket(packet_data, blkNumber, size, packet_source);
+    if (read > 0) {
+      packet_source += read;
+    }
+
     do
     {
       uart_write_bytes(EX_UART_NUM, (char *)packet_data, PACKET_1K_SIZE + PACKET_OVERHEAD);

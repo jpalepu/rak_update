@@ -33,7 +33,7 @@
 #include <stdint.h>
 
 // === UART DEFINES ====
-#define EX_UART_NUM UART_NUM_0
+#define EX_UART_NUM UART_NUM_2
 #define BUF_SIZE (1080)
 
 // === LED pin used to show transfer activity ===
@@ -71,7 +71,7 @@
 #define YM_MAX_FILESIZE         (10*1024*1024)
 
 int Ymodem_Receive (FILE *ffd, unsigned int maxsize, char* getname);
-int Ymodem_Transmit (char* sendFileName, unsigned int sizeFile, FILE *ffd);
+int Ymodem_Transmit (char* fileName, const uint8_t *fileData, unsigned int fileSize);
 
 
 #endif
