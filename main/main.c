@@ -384,13 +384,15 @@
 #define UART_NUM_RX UART_NUM_1  
 #define UART_NUM_TX UART_NUM_2  // rx
  
-#define BUF_SIZE (1024)
-#define RD_BUF_SIZE (BUF_SIZE)
-#define RINGBUF_SIZE (BUF_SIZE * 10)
+#define BUF_SIZE 1024
+#define RD_BUF_SIZE BUF_SIZE
+#define RINGBUF_SIZE BUF_SIZE * 10
  
 static const char *TAG_RX = "UART_RX";
 static const char *TAG_TX = "UART_TX";
- 
+static const char *TAG = "UART_BUFFER";
+
+
 RingbufHandle_t ringbuf_handle;
  
 // Configure UART parameters
@@ -466,7 +468,8 @@ void app_main(void)
     xTaskCreate(uart_sniffer_task, "uart_sniffer_task_rx", 4096, (void *)UART_NUM_RX, 10, NULL);
     xTaskCreate(uart_sniffer_task, "uart_sniffer_task_tx", 4096, (void *)UART_NUM_TX, 10, NULL);
  
-    vTaskDelay(pdMS_TO_TICKS(75000)); // have to experiment and wait 
+    ESP_LOGI(TAG, "Will start to print");
+    vTaskDelay(pdMS_TO_TICKS(10000));  
  
     // Print logs from ring buffer
     print_logs_from_ringbuffer();
